@@ -358,6 +358,29 @@ def serve_http(bind: str):
     return srv
 
 
+async def bind_tailnet_later(ws_servers: list):
+    """Tailscale came up after us (normal at boot: the user unit can start
+    before tailscaled has an address). Keep looking, and add the tailnet
+    listeners the moment an address appears -- without this the broker sat
+    loopback-only for days and the phone could never reach it."""
+    global ADVERTISED_HOST
+    while True:
+        await asyncio.sleep(15)
+        ts = tailscale_ip()
+        if not ts:
+            continue
+        try:
+            serve_http(ts)
+            ws_servers.append(await serve(ws_handler, ts, WS_PORT, ping_interval=20,
+                                          ping_timeout=20, max_size=4 * 1024 * 1024))
+        except OSError as e:
+            log.error("tailscale is up at %s but binding failed - %s", ts, e)
+            continue
+        ADVERTISED_HOST = f"{ts}:{HTTP_PORT}"
+        log.info("tailscale came up - now also listening on %s", ts)
+        return
+
+
 async def main():
     global LOOP, ADVERTISED_HOST
     LOOP = asyncio.get_running_loop()
@@ -366,12 +389,20 @@ async def main():
         format="%(asctime)s %(levelname)s %(message)s")
 
     binds = ["127.0.0.1"]
-    ts = tailscale_ip()
+    # At boot the unit often starts before tailscaled has an address; give it
+    # a short grace period before settling for loopback.
+    ts = None
+    for _ in range(10):
+        ts = tailscale_ip()
+        if ts:
+            break
+        await asyncio.sleep(3)
     if ts:
         binds.append(ts)
         ADVERTISED_HOST = f"{ts}:{HTTP_PORT}"
     else:
-        log.warning("no tailscale address found - binding loopback only")
+        log.warning("no tailscale address yet - binding loopback, will add the "
+                    "tailnet address when it appears")
 
     for b in binds:
         try:
@@ -382,8 +413,11 @@ async def main():
 
     log.info("ws endpoint on %s:%d", ",".join(binds), WS_PORT)
     log.info("pairing token: %s", TOKEN_FILE)
+    late: list = []
     async with serve(ws_handler, binds, WS_PORT, ping_interval=20,
                      ping_timeout=20, max_size=4 * 1024 * 1024):
+        if not ts:
+            asyncio.create_task(bind_tailnet_later(late))
         await asyncio.Future()
 
 

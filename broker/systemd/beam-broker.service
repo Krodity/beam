@@ -2,6 +2,8 @@
 Description=beam-broker — bridges the Beam Android app to browser extensions
 After=network-online.target tailscaled.service
 Wants=network-online.target
+StartLimitBurst=10
+StartLimitIntervalSec=120
 
 [Service]
 Type=simple
@@ -12,8 +14,6 @@ ExecStartPre=-/usr/bin/tailscale status --self=true --peers=false
 ExecStart=/usr/bin/python3 %REPO%/broker/beam_broker.py
 Restart=on-failure
 RestartSec=5
-StartLimitBurst=10
-StartLimitIntervalSec=120
 
 [Install]
 WantedBy=default.target
