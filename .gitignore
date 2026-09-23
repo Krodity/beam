@@ -1,0 +1,17 @@
+# Gradle / Android build output
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/local.properties
+
+# Local secrets — the pairing token lives in ~/.config/beam/token, never here
+token
+*.keystore
+
+# Everything except the published APK in dist/
+*.apk
+!dist/*.apk
+
+.DS_Store
+extension/local-config.json

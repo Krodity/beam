@@ -1,0 +1,48 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Beam host</title>
+<style>
+  :root { color-scheme: light dark; --fg:#18181b; --bg:#fff; --mut:#71717a; --line:#e4e4e7; --ok:#16a34a; --bad:#b91c1c; --accent:#3b82f6; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#e4e4e7; --bg:#0a0a0a; --mut:#a1a1aa; --line:#27272a; } }
+  body { font: 13px/1.5 system-ui, sans-serif; color: var(--fg); background: var(--bg); margin: 0; padding: 18px; width: 320px; }
+  h1 { font-size: 14px; margin: 0 0 2px; }
+  p.sub { color: var(--mut); margin: 0 0 14px; }
+  label { display: block; margin: 10px 0 3px; font-weight: 600; }
+  input { width: 100%; box-sizing: border-box; padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: inherit; font: inherit; }
+  button { margin-top: 14px; width: 100%; padding: 8px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  .state { margin-top: 14px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+  .hint { color: var(--mut); font-size: 12px; margin-top: 4px; }
+  button.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+  /* White plate whatever the theme — an inverted QR is one many scanners refuse. */
+  #qr { background: #fff; border-radius: 8px; padding: 8px; width: 200px; height: 200px;
+        box-sizing: border-box; margin: 12px auto 6px; }
+  #qr svg { display: block; width: 100%; height: 100%; }
+  .warn { color: #b45309; font-size: 12px; margin: 0; text-align: center; }
+  @media (prefers-color-scheme: dark) { .warn { color: #f4a259; } }
+</style>
+<h1>Beam host</h1>
+<p class="sub">Pairs this browser with the Beam Android app.</p>
+
+<label for="broker">Broker</label>
+<input id="broker" placeholder="ws://hostname:8781">
+<div class="hint">The machine running <code>beam-broker</code>, reachable over Tailscale.</div>
+
+<label for="token">Pairing token</label>
+<input id="token" type="password" placeholder="from ~/.config/beam/token">
+
+<label for="name">This PC's name</label>
+<input id="name" placeholder="living room PC">
+
+<button id="save">Save &amp; connect</button>
+<div class="state" id="state"><span class="dot"></span><span id="msg">checking…</span></div>
+
+<button id="qrtoggle" class="ghost">Show pairing QR</button>
+<div id="qrbox" hidden>
+  <div id="qr"></div>
+  <p class="warn">Anyone who scans this can send videos to this browser. Don't screenshot or share it.</p>
+  <p class="hint" id="qraddr"></p>
+</div>
+
+<script src="qrcode.js"></script>
+<script src="options.js"></script>

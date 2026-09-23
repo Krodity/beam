@@ -1,0 +1,19 @@
+[Unit]
+Description=beam-broker — bridges the Beam Android app to browser extensions
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# The broker binds the Tailscale address when there is one, so give Tailscale a
+# moment to be ready. Leading "-" keeps this optional: machines without Tailscale
+# still start fine and simply bind loopback.
+ExecStartPre=-/usr/bin/tailscale status --self=true --peers=false
+ExecStart=/usr/bin/python3 %REPO%/broker/beam_broker.py
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=10
+StartLimitIntervalSec=120
+
+[Install]
+WantedBy=default.target

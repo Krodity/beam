@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The broker is plain HTTP on a private tailnet. Cleartext is allowed because
+     Tailscale addresses live in 100.64.0.0/10, which the <domain> syntax cannot
+     express as a range - pinning individual hosts here would silently break the
+     app the moment the user typed an IP instead of the MagicDNS name. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
