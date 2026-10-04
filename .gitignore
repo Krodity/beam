@@ -15,3 +15,7 @@ token
 
 .DS_Store
 extension/local-config.json
+
+# Python
+__pycache__/
+*.pyc

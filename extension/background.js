@@ -494,6 +494,82 @@ async function control({ action, value }) {
   return status();
 }
 
+// ── per-tab media (the desktop shell's media card) ───────────────────────────
+// The browser shows every tab through ONE MPRIS player, which follows whichever
+// tab played last. These let the shell list each tab's media and switch between
+// them: start one tab and the OS player moves to it.
+
+/** One cheap look at every frame of a tab: its media elements + mediaSession. */
+async function tabMedia(tab) {
+  let results;
+  try {
+    results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id, allFrames: true }, world: "MAIN",
+      func: () => {
+        // Skip decoration: looping hero clips and muted autoplay previews.
+        const els = [...document.querySelectorAll("video, audio")]
+          .filter((m) => (m.readyState > 0 || m.currentSrc || m.src)
+            && !(m.loop && (m.duration || 0) < 120) && !(m.muted && m.autoplay));
+        const m = navigator.mediaSession?.metadata;
+        // Only media that's been started (or that the page published to the OS):
+        // unplayed demo clips on a landing page aren't "a tab playing something".
+        if (!els.some((e) => !e.paused || e.currentTime > 0) && !m?.title) return null;
+        const playing = els.find((e) => !e.paused && !e.ended);
+        const best = playing || els.sort((a, b) => (b.duration || 0) - (a.duration || 0))[0];
+        return {
+          playing: !!playing,
+          position: best ? best.currentTime : 0,
+          duration: best && Number.isFinite(best.duration) ? best.duration : 0,
+          title: m?.title || "", artist: m?.artist || "",
+          hasElement: !!best,
+        };
+      },
+    });
+  } catch {
+    return null;                                   // chrome://, PDFs, blocked hosts
+  }
+  const frames = results.map((r) => r.result).filter(Boolean);
+  if (!frames.some((f) => f.hasElement)) return null;
+  const pick = frames.find((f) => f.playing) || frames.find((f) => f.hasElement);
+  const meta = frames.find((f) => f.title) || {};
+  return { ...pick, title: meta.title || "", artist: meta.artist || "" };
+}
+
+async function mediaTabs() {
+  const all = (await chrome.tabs.query({}))
+    .filter((t) => /^https?:/.test(t.url || "") && !t.discarded);
+  const looked = await Promise.all(all.map(async (t) => ({ t, m: await tabMedia(t) })));
+  return {
+    tabs: looked.filter((x) => x.m).map(({ t, m }) => ({
+      id: t.id, pageTitle: t.title || "", url: t.url || "", favicon: t.favIconUrl || "",
+      site: (() => { try { return new URL(t.url).hostname.replace(/^www\./, ""); } catch { return ""; } })(),
+      audible: !!t.audible, active: !!t.active,
+      title: m.title, artist: m.artist, playing: m.playing, position: m.position, duration: m.duration,
+    })).sort((a, b) => Number(b.playing) - Number(a.playing) || Number(b.audible) - Number(a.audible)),
+  };
+}
+
+/** play / pause / toggle one tab's best media. `only` pauses every other tab first. */
+async function tabControl(tabId, action) {
+  const tab = await chrome.tabs.get(Number(tabId));
+  const p = await requireMedia(tab);
+  // play() can stay pending for a long time (a tab that was never shown defers its media until it is),
+  // while the element already reports !paused. Don't hold the caller hostage to it.
+  const r = await Promise.race([
+    askFrame(tab.id, p.frame.frameId, { cmd: "control", action }),
+    new Promise((res) => setTimeout(() => res({ ok: true, pending: true }), 3000)),
+  ]);
+  if (!r) throw new Error("that tab stopped responding — it may have navigated");
+  if (r.error) throw new Error(r.error);
+  if (r.blocked) await forcePlay(tab.id, p.frame, r.rect);
+  return { ok: true };
+}
+
+async function pauseOthers(keepId) {
+  const others = (await mediaTabs()).tabs.filter((t) => t.playing && t.id !== keepId);
+  await Promise.all(others.map((t) => tabControl(t.id, "pause").catch(() => {})));
+}
+
 // ── RPC methods the phone can call ───────────────────────────────────────────
 const METHODS = {
   ping: async () => ({ ok: true, at: Date.now() }),
@@ -514,6 +590,24 @@ const METHODS = {
         }))
         .sort((a, b) => Number(b.beam) - Number(a.beam) || Number(b.audible) - Number(a.audible)),
     };
+  },
+
+  /** Every tab with media (for the desktop shell), playing ones first. */
+  mediaTabs,
+
+  /** Switch the browser's media to this tab: pause the others, play this one. */
+  mediaPlay: async ({ tabId }) => {
+    await pauseOthers(Number(tabId));
+    return tabControl(tabId, "play");
+  },
+
+  mediaPause: async ({ tabId }) => tabControl(tabId, "pause"),
+
+  /** Bring a tab to the front (doesn't change what the phone remote drives). */
+  showTab: async ({ tabId }) => {
+    const tab = await chrome.tabs.update(Number(tabId), { active: true });
+    await chrome.windows.update(tab.windowId, { focused: true }).catch(() => {});
+    return { ok: true };
   },
 
   /** Make an existing PC tab the one the remote drives. */

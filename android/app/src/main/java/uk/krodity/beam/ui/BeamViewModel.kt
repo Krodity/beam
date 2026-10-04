@@ -34,7 +34,7 @@ data class UiState(
     val pcTabs: List<PcTab> = emptyList(),
     val sending: Boolean = false,
     val error: String? = null,
-    /** A non-error one-liner for the snackbar ("Playing on aepc Chromium"). */
+    /** A non-error one-liner for the snackbar ("Playing on Desktop Chromium"). */
     val info: String? = null,
 ) {
     val activeHostName: String
