@@ -12,6 +12,13 @@ What gets sent is the page's **URL**, not the video stream. The PC opens it in
 its own browser, where you're already logged in, so DRM and members-only
 content (Crunchyroll, Netflix, …) plays fine there.
 
+<p align="center">
+  <img src="docs/images/start.png" width="250" alt="Start page">
+  <img src="docs/images/browse.png" width="250" alt="Browsing YouTube inside Beam">
+  <img src="docs/images/remote.png" width="250" alt="Remote tab">
+</p>
+
+
 Three parts:
 
 | Part | Where it runs | What it does |
